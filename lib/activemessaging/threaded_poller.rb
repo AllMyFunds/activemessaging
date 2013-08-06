@@ -14,9 +14,9 @@ module ActiveMessaging
 
     attr_accessor :configuration, :receiver, :connection, :workers, :busy, :running, :pause
 
-    # 
+    #
     # connection is a string, name of the connection from broker.yml to use for this threaded poller instance
-    # 
+    #
     # configuration is a list of hashes
     # each has describes a group of worker threads
     # for each group, define what priorities those workers will process
@@ -26,7 +26,7 @@ module ActiveMessaging
     #       :priorities => [1,2,3] # what message priorities this thread will process
     #     }
     #   ]
-    # 
+    #
     def initialize(connection='default', configuration={})
       # default config is a pool size of 3 worker threads
       self.configuration = configuration || [{:pool_size => 3}]
@@ -39,21 +39,21 @@ module ActiveMessaging
 
       # these are workers ready to use
       self.workers = []
-      
+
       # these are workers already working
       self.busy = []
-      
+
       # this indicates if we are running or not, helps threads to stop gracefully
       self.running = true
-      
+
       # subscribe will create the connections based on subscriptions in processsors
       # (you can't find or use the connection until it is created by calling this)
       ActiveMessaging::Gateway.subscribe
-      
+
       # create a message receiver actor, ony need one, using connection
       receiver_connection = ActiveMessaging::Gateway.connection(connection)
       self.receiver = MessageReceiver.new(current_actor, receiver_connection, pause)
-      
+
       # start the workers based on the config
       configuration.each do |c|
         (c[:pool_size] || 1).times{ self.workers << Worker.new_link(current_actor, c) }
@@ -69,21 +69,21 @@ module ActiveMessaging
     def stop
       logger.info "ActiveMessaging::ThreadedPoller stop"
       # indicates to all busy workers not to pick up another messages, but does not interrupt
-      # also indicates to the message receiver to stop getting more messages 
+      # also indicates to the message receiver to stop getting more messages
       self.running = false
 
       # tell each waiting worker to shut down.  Running ones will be allowed to finish
-      receiver.terminate! if receiver.alive?
+      receiver.async.terminate if receiver.alive?
       logger.info "ActiveMessaging::ThreadedPoller receiver terminated"
 
-      workers.each { |w| w.terminate! if w.alive? }
+      workers.each { |w| w.async.terminate if w.alive? }
       logger.info "ActiveMessaging::ThreadedPoller workers terminated"
 
 
       after(0) { signal(:shutdown) } if stopped?
     end
 
-    # recursive method, uses celluloid 'after' to keep calling 
+    # recursive method, uses celluloid 'after' to keep calling
     def log_status
       return unless logger.debug?
       logger.debug("ActiveMessaging::ThreadedPoller: conn:#{connection}, #{workers.count}, #{busy.count}, #{running}")
@@ -91,15 +91,15 @@ module ActiveMessaging
     end
 
     def receive(worker)
-      receiver.receive!(worker) if (receiver && running && worker)
+      receiver.async.receive(worker) if (receiver && running && worker)
     end
 
     def dispatch(message, worker)
       workers.delete(worker)
       busy << worker
-      worker.execute!(message)
+      worker.async.execute(message)
     end
-    
+
     def executed(worker)
       busy.delete(worker)
 
@@ -131,7 +131,7 @@ module ActiveMessaging
         end
       end
     end
-    
+
     def stopped?
       (!running && busy.empty?)
     end
@@ -155,9 +155,9 @@ module ActiveMessaging
 
     def initialize(poller, connection, pause=1)
       logger.debug("MessageReceiver initialize: poller:#{poller}, connection:#{connection}, pause:#{pause}")
-      
+
       raise "No connection found for '#{poller.connection}'" unless connection
-      
+
       self.poller     = poller
       self.connection = connection
       self.pause      = pause
@@ -172,7 +172,7 @@ module ActiveMessaging
 
       if message
         logger.debug("ActiveMessaging::MessageReceiver.receive: message:'#{message.inspect}'")
-        poller.dispatch!(message, worker)
+        poller.async.dispatch(message, worker)
       else
         if (!poller || !poller.alive? || !poller.running)
           logger.debug("ActiveMessaging::MessageReceiver.receive: terminate")
@@ -181,7 +181,7 @@ module ActiveMessaging
         logger.debug("ActiveMessaging::MessageReceiver.receive: no message for worker #{worker.object_id}, retry in #{pause} sec")
         after(pause) { receive(worker) }
       end
-      
+
     end
 
     def inspect
@@ -215,7 +215,7 @@ module ActiveMessaging
         ::ActiveRecord::Base.clear_active_connections! if defined?(::ActiveRecord)
       end
 
-      poller.executed!(current_actor)
+      poller.async.executed(current_actor)
     end
 
     def inspect
@@ -227,7 +227,7 @@ module ActiveMessaging
     end
 
     def logger; ::ActiveMessaging.logger; end
-    
+
   end
 
 end
