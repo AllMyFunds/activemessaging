@@ -21,6 +21,10 @@ module ActiveMessaging
       ActiveMessaging::Gateway.publish(destination_name, message, self.class, headers, timeout)
     end
 
+    def direct_publish destination, message, headers={}, timeout=10
+      ActiveMessaging::Gateway.direct_publish(destination, message, self.class, headers, timeout)
+    end
+
     def receive destination_name, headers={}, timeout=10
       ActiveMessaging::Gateway.receive(destination_name, self.class, headers, timeout)
     end
