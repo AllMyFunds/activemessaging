@@ -13,13 +13,13 @@ end
 module ActiveMessaging
   module Adapters
     module Jms
-    
+
       class Connection
         include ActiveMessaging::Adapter
         register :jms
-        
+
         attr_accessor :reliable, :connection, :session, :producers, :consumers
-        
+
         def initialize cfg={}
           @url = cfg[:url]
           @login = cfg[:login]
@@ -37,7 +37,7 @@ module ActiveMessaging
             raise "Either jndi or connection_factory has to be set in the config."
           end
           raise "Connection factory could not be initialized." if @connection_factory.nil?
-          
+
           @connection = @connection_factory.create_connection()
           @session = @connection.createSession(false, 1)
           @destinations = []
@@ -45,12 +45,12 @@ module ActiveMessaging
           @consumers = {}
           @connection.start
         end
-        
+
         def subscribe queue_name, headers={}
           queue_name = check_destination_type queue_name, headers
           find_or_create_consumer queue_name, headers
         end
-        
+
         def unsubscribe queue_name, headers={}
           queue_name = check_destination_type queue_name, headers
           consumer = @consumers[queue_name]
@@ -59,7 +59,7 @@ module ActiveMessaging
             @consumers.delete queue_name
           end
         end
-        
+
         def send queue_name, body, headers={}
           queue_name = check_destination_type queue_name, headers
           producer = find_or_create_producer queue_name, headers.symbolize_keys
@@ -105,11 +105,11 @@ module ActiveMessaging
             condition_message(message)
           end
         end
-        
+
         def received message, headers={}
           #do nothing
         end
-        
+
         def unreceive message, headers={}
           # do nothing
         end
@@ -124,7 +124,7 @@ module ActiveMessaging
           @consumers = {}
           @producers = {}
         end
-        
+
         def find_or_create_producer queue_name, headers={}
           producer = @producers[queue_name]
           if producer.nil?
@@ -133,7 +133,7 @@ module ActiveMessaging
           end
           producer
         end
-        
+
         def find_or_create_consumer queue_name, headers={}
           consumer = @consumers[queue_name]
           if consumer.nil?
@@ -143,12 +143,12 @@ module ActiveMessaging
             else
               consumer = @session.create_consumer destination
             end
-            
+
             @consumers[queue_name] = consumer
           end
           consumer
         end
-        
+
         def find_or_create_destination queue_name, headers={}
           destination = find_destination queue_name, headers[:destination_type]
           if destination.nil?
@@ -164,11 +164,11 @@ module ActiveMessaging
           end
           destination
         end
-        
+
         protected
-        
+
         def condition_message message
-          message.class.class_eval { 
+          message.class.class_eval {
             alias_method :body, :text unless method_defined? :body
 
             def headers
@@ -176,15 +176,15 @@ module ActiveMessaging
               puts "/#{$1}/#{$2}"
               {'destination' => "/#{$1}/#{$2}"}
             end
-            
+
             def matches_subscription?(subscription)
-              self.headers['destination'].to_s == subscription.value.to_s
+              self.headers['destination'].to_s == subscription.destination.value.to_s
             end
-            
+
           } unless message.nil? || message.respond_to?(:headers)
           message
         end
-        
+
         def check_destination_type queue_name, headers
           stringy_h = headers.stringify_keys
           if queue_name =~ %r{^/(topic|queue)/(.*)$}  && !stringy_h.has_key?('destination_type')
@@ -194,9 +194,9 @@ module ActiveMessaging
             raise "Must specify destination type either with either 'headers[\'destination_type\']=[:queue|:topic]' or /[topic|queue]/destination_name for queue name '#{queue_name}'" unless [:topic, :queue].include? stringy_h['destination_type']
           end
         end
-        
+
         def find_destination queue_name, type
-          @destinations.find do |d| 
+          @destinations.find do |d|
             if d.is_a?(javax.jms.Topic) && type == :topic
               d.topic_name == queue_name
             elsif d.is_a?(javax.jms.Queue) && type == :queue
@@ -205,16 +205,16 @@ module ActiveMessaging
           end
         end
       end
-#      
+#
 #      class RubyMessageListener
 #         include javax.jms.MessageListener
-# 
+#
 #         def initialize(connection, destination, name)
 #           @connection = connection
 #           @destination = destination
 #           @name = name
 #         end
-# 
+#
 #         def onMessage(msg)
 #           headers = {}
 #           enm = msg.getPropertyNames
@@ -227,7 +227,7 @@ module ActiveMessaging
 #           STDERR.puts "something went really wrong with a message: #{e.inspect}"
 #        end
 #      end
-#      
+#
 #      class JMSRecvMessage < ActiveMessaging::Adapters::Base::Message
 #         def initialize(headers, body, name, command='MESSAGE')
 #           @headers = headers
