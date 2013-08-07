@@ -319,15 +319,14 @@ module ActiveMessaging
 
         publish_headers = headers.delete(:publish_headers) || {}
         broker_name = headers.delete(:broker) || "default"
-        destination = Destination.new(:direct_destination, destination_queue, publish_headers, broker_name)
+        headers = headers.reverse_merge(publish_headers)
 
-        headers = headers.reverse_merge(destination.publish_headers)
         begin
           Timeout.timeout timeout do
-            connection(destination.broker_name).send destination.value, body, headers
+            connection(broker_name).send destination_queue, body, headers
           end
         rescue Timeout::Error=>toe
-          ActiveMessaging.logger.error("Timed out trying to send the message to destination #{destination.value} via broker #{destination.broker_name}")
+          ActiveMessaging.logger.error("Timed out trying to send the message to destination #{destination_queue} via broker #{broker_name}")
           raise toe
         end
       end
