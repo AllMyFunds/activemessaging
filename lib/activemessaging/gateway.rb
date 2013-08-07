@@ -121,10 +121,14 @@ module ActiveMessaging
 
       def connection broker_name='default'
         return @connections[broker_name] if @connections.has_key?(broker_name)
+        @connections[broker_name] = new_connection(broker_name)
+      end
+
+      def new_connection broker_name='default'
         config = load_connection_configuration(broker_name)
         adapter_class = Gateway.adapters[config[:adapter]]
         raise "Unknown messaging adapter #{config[:adapter].inspect}!" if adapter_class.nil?
-        @connections[broker_name] = adapter_class.new(config)
+        adapter_class.new(config)
       end
 
       def register_adapter adapter_name, adapter_class
@@ -320,10 +324,11 @@ module ActiveMessaging
         publish_headers = headers.delete(:publish_headers) || {}
         broker_name = headers.delete(:broker) || "default"
         headers = headers.reverse_merge(publish_headers)
+        publishing_connection = headers.delete(:connection) || connection(broker_name)
 
         begin
           Timeout.timeout timeout do
-            connection(broker_name).send destination_queue, body, headers
+            publishing_connection.send destination_queue, body, headers
           end
         rescue Timeout::Error=>toe
           ActiveMessaging.logger.error("Timed out trying to send the message to destination #{destination_queue} via broker #{broker_name}")
