@@ -314,11 +314,11 @@ module ActiveMessaging
       end
 
       def direct_publish destination_queue, body, publisher=nil, headers={}, timeout=10
-        raise "You cannot have a nil or empty destination." if destination.nil?
+        raise "You cannot have a nil or empty destination." if destination_queue.nil?
         raise "You cannot have a nil or empty message body." if (body.nil? || body.empty?)
 
         publish_headers = headers.delete(:publish_headers) || {}
-        broker_name = headers.delete(:broker) || {}
+        broker_name = headers.delete(:broker) || "default"
         destination = Destination.new(:direct_destination, destination_queue, publish_headers, broker_name)
 
         details = {
