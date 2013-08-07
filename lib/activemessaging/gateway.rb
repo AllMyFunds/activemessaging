@@ -321,20 +321,13 @@ module ActiveMessaging
         broker_name = headers.delete(:broker) || "default"
         destination = Destination.new(:direct_destination, destination_queue, publish_headers, broker_name)
 
-        details = {
-          :publisher => publisher,
-          :destination => destination,
-          :direction => :outgoing
-        }
-        message = OpenStruct.new(:body => body, :headers => headers.reverse_merge(destination.publish_headers))
+        headers = headers.reverse_merge(destination.publish_headers)
         begin
           Timeout.timeout timeout do
-            execute_filter_chain(:outgoing, message, details) do |message|
-              connection(destination.broker_name).send destination.value, message.body, message.headers
-            end
+            connection(destination.broker_name).send destination.value, body, headers
           end
         rescue Timeout::Error=>toe
-          ActiveMessaging.logger.error("Timed out trying to send the message #{message} to destination #{destination.value} via broker #{destination.broker_name}")
+          ActiveMessaging.logger.error("Timed out trying to send the message to destination #{destination.value} via broker #{destination.broker_name}")
           raise toe
         end
       end
