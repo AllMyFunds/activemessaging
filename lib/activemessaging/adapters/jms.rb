@@ -124,6 +124,7 @@ module ActiveMessaging
           @consumers = {}
           @producers = {}
         end
+        alias_method :close, :disconnect
 
         def find_or_create_producer queue_name, headers={}
           producer = @producers[queue_name]
