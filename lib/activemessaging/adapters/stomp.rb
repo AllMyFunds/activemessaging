@@ -5,7 +5,7 @@ require 'activemessaging/adapters/base'
 module ActiveMessaging
   module Adapters
     module Stomp
-      
+
       class Connection < ActiveMessaging::Adapters::BaseConnection
         register :stomp
 
@@ -15,7 +15,7 @@ module ActiveMessaging
           @retryMax = cfg[:retryMax] || 0
           @deadLetterQueue = cfg[:deadLetterQueue] || nil
           @deadLetterQueuePrefix = cfg[:deadLetterQueuePrefix] || nil
-        
+
           cfg[:login] ||= ""
           cfg[:passcode] ||= ""
           cfg[:host] ||= "localhost"
@@ -32,7 +32,7 @@ module ActiveMessaging
           connect_headers['client-id'] = cfg[:clientId] if cfg[:clientId]
           @stomp_connection = ::Stomp::Connection.new(cfg[:login],cfg[:passcode],cfg[:host],cfg[:port].to_i,cfg[:reliable],cfg[:reconnectDelay], connect_headers)
         end
-        
+
         # Checks if the connection supports dead letter queues
         def supports_dlq?
           !@deadLetterQueue.nil? || !@deadLetterQueuePrefix.nil?
@@ -77,7 +77,7 @@ module ActiveMessaging
           m = @stomp_connection.receive
           Message.new(m) if m
         end
-      
+
         def received message, headers={}
           #check to see if the ack mode for this subscription is auto or client
           # if the ack mode is client, send an ack
@@ -86,7 +86,7 @@ module ActiveMessaging
             @stomp_connection.ack(message.headers['message-id'], ack_headers)
           end
         end
-        
+
         # send has been deprecated in latest stomp gem (as it should be)
         def stomp_publish(destination_name="", message_body="", message_headers={})
           if @stomp_connection.respond_to?(:publish)
@@ -108,19 +108,19 @@ module ActiveMessaging
               retry_headers['transaction']= transaction_id
               content_type_header = retry_headers.delete('content-type')
               content_length_header = retry_headers.delete('content-length')
-              # If the content-length header in the original message is nil 
-              # then we need to set the :suppress_content_length option so 
-              # that the stomp client does not set the content-length of the 
-              # retried message. This option will allow ActiveMQ to interpret the 
+              # If the content-length header in the original message is nil
+              # then we need to set the :suppress_content_length option so
+              # that the stomp client does not set the content-length of the
+              # retried message. This option will allow ActiveMQ to interpret the
               # message as a TextMessage.
-              # This is somewhat of a hack because the setting of the :suppress_content_length 
-              # header is usually done in the messaging.rb and is removed by the time 
+              # This is somewhat of a hack because the setting of the :suppress_content_length
+              # header is usually done in the messaging.rb and is removed by the time
               # the unreceive message is called. So I am making some assumptions here
               # on whether or not to set the option
               if content_type_header and content_type_header.include?('text/plain') && content_length_header.nil?
                   retry_headers[:suppress_content_length] = true
               end
-                           
+
               retry_destination = retry_headers.delete('destination')
               retry_destination = headers[:destination] if headers[:destination]
 
@@ -144,7 +144,7 @@ module ActiveMessaging
                 retry_headers['a13g-original-destination'] = retry_destination #retry_headers.delete('destination')
                 retry_headers['persistent'] = true
                 retry_headers.delete('message-id')
-                
+
                 # If the prefix option is set then put the prefix after the /queue/ or /topic/
                 if (@deadLetterQueuePrefix)
                     dlq = add_dlq_prefix(retry_destination)
@@ -174,7 +174,7 @@ module ActiveMessaging
         end
 
       end
-      
+
       class Message < ActiveMessaging::BaseMessage
 
         def initialize(msg)
@@ -185,11 +185,11 @@ module ActiveMessaging
           # if the subscription has been specified in the headers, rely on this
           if self.headers['subscription'] && subscription.subscribe_headers['id']
             self.headers['subscription'].to_s == subscription.subscribe_headers['id'].to_s
-            
+
           # see if the destination uses a wildcard representation
           elsif subscription.destination.wildcard
             self.destination.to_s =~ subscription.destination.wildcard
-            
+
           # no subscription id? no wildcard? use the name of the destination as a straight match
           else
             self.destination.to_s == subscription.destination.value.to_s
