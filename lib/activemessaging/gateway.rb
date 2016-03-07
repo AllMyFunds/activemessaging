@@ -71,7 +71,7 @@ module ActiveMessaging
         end
         ActiveMessaging.logger.info "All connection threads have died..."
       rescue Interrupt
-        ActiveMessaging.logger.info "\n<<Interrupt received>>\n"
+        ActiveMessaging.logger.error "\n<<Interrupt received>>\n"
       rescue Object=>exception
         ActiveMessaging.logger.error "#{exception.class.name}: #{exception.message}\n\t#{exception.backtrace.join("\n\t")}"
         raise exception
@@ -205,7 +205,11 @@ module ActiveMessaging
       end
 
       def prepare_application
-        if defined? ActiveRecord
+        return unless defined?(ActiveRecord)
+
+        if ActiveRecord::VERSION::MAJOR >= 4
+          ActiveRecord::Base.connection_pool.connections.map(&:verify!)
+        else
           ActiveRecord::Base.verify_active_connections!
         end
       end
@@ -411,7 +415,7 @@ module ActiveMessaging
     end
 
     def subscribe
-      ActiveMessaging.logger.info "=> Subscribing to #{destination.value} (processed by #{processor_class})"
+      ActiveMessaging.logger.error "=> Subscribing to #{destination.value} (processed by #{processor_class})"
       Gateway.connection(@destination.broker_name).subscribe(@destination.value, subscribe_headers)
     end
 
